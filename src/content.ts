@@ -50,7 +50,6 @@
 	/** The sized element is the parent of `.dialog_content`; its inline width/height/margins are what pin the popup to a fixed size. */
 	function findBox(dialog: HTMLElement): HTMLElement | null {
 		const content = dialog.querySelector('.dialog_content');
-
 		if (!content) {
 			return null;
 		}
@@ -61,13 +60,11 @@
 	/** The receipt lives inside a custom scrollbar whose inner element is the thing that actually clips and scrolls. */
 	function findScroller(dialog: HTMLElement): Element | null {
 		const byStyle = dialog.querySelector('[class*="OBTScrollbar_root"] > div[style*="overflow: scroll"]');
-
 		if (byStyle) {
 			return byStyle;
 		}
 
 		const firstChild = dialog.querySelector('[class*="OBTScrollbar_root"] > div');
-
 		if (firstChild) {
 			return firstChild;
 		}
@@ -159,7 +156,6 @@
 		}
 
 		const dialog: HTMLElement = node;
-
 		if (fitDialog(dialog) === 'resized') {
 			return;
 		}
@@ -181,7 +177,6 @@
 				tries += 1;
 
 				const grew = fitDialog(dialog) === 'resized';
-
 				if (grew || tries >= 30 || !dialog.isConnected) {
 					window.clearInterval(timer);
 					polling.delete(dialog);
