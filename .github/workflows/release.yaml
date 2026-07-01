@@ -1,0 +1,43 @@
+name: 'Release'
+
+# Cut a release by tagging a commit on main, e.g. `git tag 1.0.0 && git push origin 1.0.0`.
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: 'write'
+
+jobs:
+  release:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Check out the repository'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Set up Bun'
+        uses: 'oven-sh/setup-bun@v2'
+
+      - name: 'Install dependencies'
+        run: 'bun install --frozen-lockfile'
+
+      - name: 'Guard against a tag that disagrees with the manifest version'
+        run: |
+          manifest_version="$(jq -r '.version' src/manifest.json)"
+          if [ "$manifest_version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match manifest version ${manifest_version}. Bump src/manifest.json first."
+            exit 1
+          fi
+
+      - name: 'Type-check'
+        run: 'bun run typecheck'
+
+      - name: 'Build and package both browsers'
+        run: 'bun run package'
+
+      - name: 'Publish the GitHub release'
+        uses: 'softprops/action-gh-release@v2'
+        with:
+          files: 'dist/*.zip'
+          generate_release_notes: true
