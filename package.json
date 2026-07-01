@@ -1,0 +1,21 @@
+{
+	"name": "amaranth-tweaks",
+	"version": "1.0.0",
+	"description": "Cross-browser extension that enlarges cramped detail popups on the Okestro groupware.",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "bun run build.ts",
+		"typecheck": "tsc --noEmit",
+		"lint": "bun run build && web-ext lint --source-dir build/firefox",
+		"dev:firefox": "bun run build && web-ext run --source-dir build/firefox --target firefox-desktop",
+		"dev:chromium": "bun run build && web-ext run --source-dir build/chromium --target chromium",
+		"package": "bun run build && web-ext build --source-dir build/firefox --artifacts-dir dist --filename amaranth-tweaks-firefox-{version}.zip --overwrite-dest && web-ext build --source-dir build/chromium --artifacts-dir dist --filename amaranth-tweaks-chromium-{version}.zip --overwrite-dest",
+		"sign": "bun run build && web-ext sign --source-dir build/firefox --artifacts-dir dist --channel unlisted"
+	},
+	"devDependencies": {
+		"bun-types": "^1.3.14",
+		"typescript": "^6.0.3",
+		"web-ext": "^10.4.0"
+	}
+}
