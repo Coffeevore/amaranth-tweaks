@@ -18,20 +18,33 @@
 	/** Boxes we have already attached a height guard to. */
 	const guarded = new WeakSet<HTMLElement>();
 
+	/** Target dialogs with a first-sight retry poll currently running. */
+	const polling = new WeakSet<HTMLElement>();
+
+	/** Target dialogs whose first-sight retry poll has already run its course. */
+	const polled = new WeakSet<HTMLElement>();
+
+	/** What `fitDialog` did, so the caller knows whether the receipt is still settling. */
+	type FitResult = 'resized' | 'fits' | 'notready';
+
 	function isTargetDialog(node: Node | null): node is HTMLElement {
 		if (!node || node.nodeType !== Node.ELEMENT_NODE) {
 			return false;
 		}
 
 		const element = node as Element;
-
 		if (!element.matches(DIALOG_SELECTOR)) {
 			return false;
 		}
 
 		const heading = element.querySelector('h1');
+		if (heading === null) {
+			return false;
+		}
 
-		return heading !== null && TARGET_TITLES.includes(heading.textContent?.trim() ?? '');
+		const title = heading.textContent?.trim() ?? '';
+
+		return TARGET_TITLES.includes(title);
 	}
 
 	/** The sized element is the parent of `.dialog_content`; its inline width/height/margins are what pin the popup to a fixed size. */
@@ -107,13 +120,13 @@
 		observer.observe(box, { attributes: true, attributeFilter: ['style'] });
 	}
 
-	/** Returns true once the popup has been resized (or needs no resizing). */
-	function fitDialog(dialog: HTMLElement): boolean {
+	/** Grows the popup to swallow its inner scroll; the result says whether it grew, already fit, or has no measurable content yet. Safe to call repeatedly — it no-ops once the popup already fits. */
+	function fitDialog(dialog: HTMLElement): FitResult {
 		const box = findBox(dialog);
 		const scroller = findScroller(dialog);
 
 		if (!box || !scroller) {
-			return false;
+			return 'notready';
 		}
 
 		const maxHeight = Math.round(window.innerHeight * MAX_VIEWPORT_RATIO);
@@ -129,7 +142,7 @@
 		target = Math.min(Math.ceil(target), maxHeight);
 
 		if (Math.abs(target - currentHeight) <= OVERFLOW_THRESHOLD) {
-			return false;
+			return 'fits';
 		}
 
 		box.dataset.amaranthHeight = String(target);
@@ -137,7 +150,7 @@
 		guardHeight(box, dialog);
 		console.debug('[amaranth-tweaks] resized popup to ' + target + 'px');
 
-		return true;
+		return 'resized';
 	}
 
 	function processDialog(node: Node): void {
@@ -147,19 +160,32 @@
 
 		const dialog: HTMLElement = node;
 
-		if (fitDialog(dialog)) {
+		if (fitDialog(dialog) === 'resized') {
 			return;
 		}
 
-		/** The receipt is fetched after the popup opens, so retry briefly until the content is present (give up after ~3s). */
+		/*
+		 * The receipt (and its images) can settle a beat after the popup opens, so poll briefly on first sight.
+		 * The subtree observer re-drives us for anything that lands later, so one bounded poll per dialog is enough.
+		 */
+		if (polling.has(dialog) || polled.has(dialog)) {
+			return;
+		}
+
+		polling.add(dialog);
+
 		let tries = 0;
 
 		const timer = window.setInterval(
 			() => {
 				tries += 1;
 
-				if (fitDialog(dialog) || tries >= 30 || !dialog.isConnected) {
+				const grew = fitDialog(dialog) === 'resized';
+
+				if (grew || tries >= 30 || !dialog.isConnected) {
 					window.clearInterval(timer);
+					polling.delete(dialog);
+					polled.add(dialog);
 				}
 			},
 			100
@@ -178,21 +204,32 @@
 		}
 	}
 
-	/**
-	 * The popup mounts as a direct child of <body>.
-	 * If a future target mounts deeper in the tree, add `subtree: true` here.
-	 */
-	const bodyObserver = new MutationObserver((mutations) => {
-		for (const mutation of mutations) {
-			for (const node of mutation.addedNodes) {
-				if (node.nodeType === Node.ELEMENT_NODE) {
-					scan(node as Element);
-				}
-			}
-		}
-	});
+	let scanScheduled = false;
 
-	bodyObserver.observe(document.body, { childList: true });
+	/** Coalesces a burst of mutations into a single document scan on the next tick. */
+	function scheduleScan(): void {
+		if (scanScheduled) {
+			return;
+		}
+
+		scanScheduled = true;
+
+		window.setTimeout(
+			() => {
+				scanScheduled = false;
+				scan(document);
+			},
+			50
+		);
+	}
+
+	/**
+	 * The popup, and the receipt inside it, can appear a beat after their container mounts, and a reused dialog shell may refill without re-inserting itself.
+	 * Watching the whole <body> subtree — not just direct additions — catches the dialog whenever its content lands, and re-fits it on later re-renders.
+	 */
+	const bodyObserver = new MutationObserver(scheduleScan);
+
+	bodyObserver.observe(document.body, { childList: true, subtree: true });
 
 	/** Re-fit whatever is open when the window is resized. */
 	let resizeTimer = 0;
