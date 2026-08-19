@@ -1,3 +1,5 @@
+import { initAttendance } from './attendance';
+
 (() => {
 	'use strict';
 
@@ -252,3 +254,5 @@
 
 	console.info('[amaranth-tweaks] active on ' + location.host);
 })();
+
+initAttendance();
