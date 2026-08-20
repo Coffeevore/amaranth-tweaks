@@ -4,11 +4,12 @@ A cross-browser (Firefox + Chromium) extension with a few quality-of-life tweaks
 
 ## What it does
 
-Three independent tweaks, all scoped to `gw.okestro.com` and doing nothing anywhere else:
+Four independent tweaks, all scoped to `gw.okestro.com` and doing nothing anywhere else:
 
 - **Bigger detail popups.** When a cramped detail popup opens (such as the `카드사용내역상세` card-usage receipt), a content script measures how much of the content is hidden and grows the popup just enough to show all of it — centered, and capped at 90% of the window height (only then falling back to an internal scroll). It touches only the popup's height, so drag-to-move still works, and it does nothing if the popup already fits or the markup changes.
 - **Check-in time badge.** Fetches today's check-in time from the groupware's own HR API and shows it next to your name in the header.
 - **Persistent login.** Re-writes the groupware's session cookies with an expiry so they survive a browser restart, keeping you signed in for the remainder of the server session instead of dropping you back at the login screen.
+- **Un-clipped approval editor.** On Firefox, the rich-text editor in an e-approval form (such as `출장 정산서(국내)`) overflows its row and gets painted over from below, hiding the totals row and the editor's own view tabs. One injected CSS rule takes the editor's wrapper off percentage heights, which makes Firefox lay the form out the way Chromium already does.
 
 ## Requirements
 
@@ -19,6 +20,7 @@ Three independent tweaks, all scoped to `gw.okestro.com` and doing nothing anywh
 - `src/content.ts` — the entry point: the popup resizer, plus the wiring that starts the other two features.
 - `src/attendance.ts` — the check-in badge; reads the time from the HR API using your active session and renders it via a CSS `::after` rule so the site's React tree never sees a foreign node.
 - `src/persist-session.ts` — the session-cookie persistence.
+- `src/unclip-editor.ts` — the approval-form editor fix; a single injected CSS rule.
 - `src/manifest.json` — the shared Manifest V3 source; the Firefox build keeps `browser_specific_settings`, the Chromium build drops it.
 - `build.ts` — the Bun build script; bundles `src/content.ts` and emits `build/firefox` and `build/chromium`.
 - `tsconfig.json` — TypeScript config (type-checking only; Bun does the bundling).
@@ -74,6 +76,8 @@ const TARGET_TITLES = ['카드사용내역상세', '현금영수증상세'];
 **Popups.** The popup is a WEHAGO/Orbit `OBTDialog` whose size is hard-coded in inline styles (`width: 444px; height: 620px`), with the receipt living inside a fixed-height custom scrollbar — so tall receipts get clipped. The script finds the sized box (the parent of `.dialog_content`), reads how far its inner scroll area overflows, and grows the box and its `.dialog_data` column by that amount. The new height is written with `!important` and re-applied by a small `MutationObserver` if the framework ever resets it, while position is left untouched so dragging keeps working.
 
 **Persistent login.** The groupware issues its auth cookies without an expiry, so the browser drops them on close even while the server session is still valid. The script re-writes the same cookies with an expiry pinned to the server's own session deadline, so a restart keeps you signed in for whatever remains of that window — and never longer.
+
+**Approval editor.** The form body is a table cell (`#divFormContents`) carrying a CSS height of 350px, and the editor's wrapper (`.editor_area`) inside it asks for `height: 100%` while the editor itself is 500px tall. Blink resolves that percentage against the cell's content-grown height and everything fits; Gecko resolves it against the cell's *specified* 350px, so the editor overflows its row by 150px and the attachment and document-type blocks below render over it. `height: auto !important` on the wrapper drops the percentage, Gecko then content-sizes the row like Blink, and Blink sees no change — so the rule ships to both browsers rather than being gated on the engine.
 
 ## Troubleshooting
 
