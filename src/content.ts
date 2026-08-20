@@ -1,5 +1,6 @@
 import { initAttendance } from './attendance';
 import { initSessionPersistence } from './persist-session';
+import { initUnclipEditor } from './unclip-editor';
 
 (() => {
 	'use strict';
@@ -258,3 +259,4 @@ import { initSessionPersistence } from './persist-session';
 
 initAttendance();
 initSessionPersistence();
+initUnclipEditor();
