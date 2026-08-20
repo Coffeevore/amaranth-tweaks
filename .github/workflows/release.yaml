@@ -14,10 +14,10 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repository'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v7'
 
       - name: 'Set up Bun'
-        uses: 'oven-sh/setup-bun@v2'
+        uses: 'oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6'
 
       - name: 'Install dependencies'
         run: 'bun install --frozen-lockfile'
@@ -37,7 +37,7 @@ jobs:
         run: 'bun run package'
 
       - name: 'Publish the GitHub release'
-        uses: 'softprops/action-gh-release@v2'
+        uses: 'softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228'
         with:
           files: 'dist/*.zip'
           generate_release_notes: true
