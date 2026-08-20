@@ -1,5 +1,6 @@
 import { initAttendance } from './attendance';
 import { initSessionPersistence } from './persist-session';
+import { initUnclipEditor } from './unclip-editor';
 
 (() => {
 	'use strict';
@@ -82,13 +83,12 @@ import { initSessionPersistence } from './persist-session';
 	}
 
 	function applyHeight(box: HTMLElement, dialog: HTMLElement, height: number): void {
-		box.style.setProperty('height', height + 'px', 'important');
-		box.style.setProperty('margin-top', -Math.round(height / 2) + 'px');
+		box.style.setProperty('height', `${height}px`, 'important');
+		box.style.setProperty('margin-top', `${-Math.round(height / 2)}px`);
 
 		const data = dialog.querySelector<HTMLElement>('.dialog_data');
-
 		if (data) {
-			data.style.setProperty('height', height + 'px', 'important');
+			data.style.setProperty('height', `${height}px`, 'important');
 		}
 	}
 
@@ -112,7 +112,7 @@ import { initSessionPersistence } from './persist-session';
 
 			const wanted = box.dataset.amaranthHeight;
 
-			if (wanted && box.style.height !== wanted + 'px') {
+			if (wanted && box.style.height !== `${wanted}px`) {
 				applyHeight(box, dialog, Number(wanted));
 			}
 		});
@@ -124,7 +124,6 @@ import { initSessionPersistence } from './persist-session';
 	function fitDialog(dialog: HTMLElement): FitResult {
 		const box = findBox(dialog);
 		const scroller = findScroller(dialog);
-
 		if (!box || !scroller) {
 			return 'notready';
 		}
@@ -132,9 +131,7 @@ import { initSessionPersistence } from './persist-session';
 		const maxHeight = Math.round(window.innerHeight * MAX_VIEWPORT_RATIO);
 		const currentHeight = box.getBoundingClientRect().height;
 		const overflow = scroller.scrollHeight - scroller.clientHeight;
-
 		let target = currentHeight;
-
 		if (overflow > OVERFLOW_THRESHOLD) {
 			target = currentHeight + overflow;
 		}
@@ -148,7 +145,8 @@ import { initSessionPersistence } from './persist-session';
 		box.dataset.amaranthHeight = String(target);
 		applyHeight(box, dialog, target);
 		guardHeight(box, dialog);
-		console.debug('[amaranth-tweaks] resized popup to ' + target + 'px');
+
+		console.debug(`[amaranth-tweaks] resized popup to ${target}px`);
 
 		return 'resized';
 	}
@@ -174,10 +172,9 @@ import { initSessionPersistence } from './persist-session';
 		polling.add(dialog);
 
 		let tries = 0;
-
 		const timer = window.setInterval(
 			() => {
-				tries += 1;
+				tries++;
 
 				const grew = fitDialog(dialog) === 'resized';
 				if (grew || tries >= 30 || !dialog.isConnected) {
@@ -193,7 +190,6 @@ import { initSessionPersistence } from './persist-session';
 	function scan(root: Document | Element): void {
 		if (isTargetDialog(root)) {
 			processDialog(root);
-
 			return;
 		}
 
@@ -229,7 +225,6 @@ import { initSessionPersistence } from './persist-session';
 
 	bodyObserver.observe(document.body, { childList: true, subtree: true });
 
-	/** Re-fit whatever is open when the window is resized. */
 	let resizeTimer = 0;
 
 	window.addEventListener(
@@ -253,8 +248,9 @@ import { initSessionPersistence } from './persist-session';
 	// Handle a popup that is already open when the script loads.
 	scan(document);
 
-	console.info('[amaranth-tweaks] active on ' + location.host);
+	console.info(`[amaranth-tweaks] active on ${location.host}`);
 })();
 
 initAttendance();
 initSessionPersistence();
+initUnclipEditor();

@@ -14,7 +14,7 @@ const SIGN_KEY_COOKIE = 'signKey';
 /** The endpoint's path is folded into the signed message; query strings are excluded, and this URL carries none. */
 const ENDPOINT_PATH = new URL(ENDPOINT).pathname;
 
-/** The name span in the header user-info button; the time hangs off this element. */
+/** The name span in the header user-info button. */
 const NAME_SELECTOR = '#userInfoPopupBtn .user-info .v-box .name_txt';
 
 /** Attribute we set on the name span; a matching `::after` rule renders its value, so React never sees a foreign node. */
@@ -75,12 +75,12 @@ function formatComeTime(raw: string): string | null {
 	const hour = raw.slice(8, 10);
 	const minute = raw.slice(10, 12);
 
-	return year + '-' + month + '-' + day + ' ' + hour + ':' + minute;
+	return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
 /** Read a browser cookie by name, URL-decoded, or null if it isn't set. */
 function readCookie(name: string): string | null {
-	const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
+	const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
 	if (match === null) {
 		return null;
 	}
@@ -90,7 +90,9 @@ function readCookie(name: string): string | null {
 
 /** A 32-hex-character request id, sent as the `transaction-id` header and folded into the signature. */
 function makeTransactionId(): string {
-	const chunk = () => (((1 + Math.random()) * 0x10000) | 0).toString(16).slice(1);
+	const chunk = () => (((1 + Math.random()) * 0x10000) | 0)
+		.toString(16)
+		.slice(1);
 
 	return chunk() + chunk() + chunk() + chunk() + chunk() + chunk() + chunk() + chunk();
 }
@@ -154,7 +156,7 @@ async function fetchComeTime(): Promise<FetchOutcome> {
 				credentials: 'omit',
 				headers: {
 					'Content-Type': 'application/json',
-					'Authorization': 'Bearer ' + token,
+					'Authorization': `Bearer ${token}`,
 					'transaction-id': transactionId,
 					'timestamp': String(timestamp),
 					'wehago-sign': signature,
@@ -206,7 +208,7 @@ function ensureStyle(): void {
 	document.head.appendChild(style);
 }
 
-/** Put the cached time on the header name span; no-ops until we have a value and the span exists. */
+/** Put the cached time on the header name span. */
 function apply(): void {
 	if (current === '') {
 		return;
@@ -222,7 +224,10 @@ function apply(): void {
 	}
 }
 
-/** Tear down the refresh schedule for good, once the session is dead — further probes would only be rejected. A fresh login reloads the page, which re-runs this script and re-arms everything. */
+/**
+ * Tear down the refresh schedule for good, once the session is dead — further probes would only be rejected.
+ * A fresh login reloads the page, which re-runs this script and re-arms everything.
+ */
 function stop(): void {
 	if (intervalId !== 0) {
 		window.clearInterval(intervalId);
