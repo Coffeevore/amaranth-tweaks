@@ -225,7 +225,6 @@ import { initUnclipEditor } from './unclip-editor';
 
 	bodyObserver.observe(document.body, { childList: true, subtree: true });
 
-	/** Re-fit whatever is open when the window is resized. */
 	let resizeTimer = 0;
 
 	window.addEventListener(
