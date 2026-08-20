@@ -14,7 +14,7 @@ const SIGN_KEY_COOKIE = 'signKey';
 /** The endpoint's path is folded into the signed message; query strings are excluded, and this URL carries none. */
 const ENDPOINT_PATH = new URL(ENDPOINT).pathname;
 
-/** The name span in the header user-info button; the time hangs off this element. */
+/** The name span in the header user-info button. */
 const NAME_SELECTOR = '#userInfoPopupBtn .user-info .v-box .name_txt';
 
 /** Attribute we set on the name span; a matching `::after` rule renders its value, so React never sees a foreign node. */
@@ -208,7 +208,7 @@ function ensureStyle(): void {
 	document.head.appendChild(style);
 }
 
-/** Put the cached time on the header name span; no-ops until we have a value and the span exists. */
+/** Put the cached time on the header name span. */
 function apply(): void {
 	if (current === '') {
 		return;
