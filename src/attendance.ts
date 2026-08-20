@@ -37,10 +37,21 @@ type AttendanceResponse = {
 	resultData?: AttendanceRecord[];
 };
 
+/** The outcome of one attendance fetch: a dead session (stop probing) or a live one that may or may not carry a check-in time. */
+type FetchOutcome =
+	| { alive: true; time: string | null }
+	| { alive: false };
+
 /** The formatted time we want on screen, cached so we can re-assert it when the header re-renders. */
 let current = '';
 
 let lastFetchAt = 0;
+
+/** Handle for the refresh interval, so a dead session can cancel it; 0 when nothing is scheduled. */
+let intervalId = 0;
+
+/** The visibility listener, kept so `stop()` can detach it; null before init and after teardown. */
+let visibilityHandler: (() => void) | null = null;
 
 /** Today as `yyyyMMdd`, matching the API's `atDt`. */
 function today(): string {
@@ -102,12 +113,12 @@ async function signRequest(token: string, transactionId: string, timestamp: numb
 	return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
-/** POST for today's own attendance (admin: false scopes it to the current user) and return the formatted check-in time. */
-async function fetchComeTime(): Promise<string | null> {
+/** POST for today's own attendance (admin: false scopes it to the current user); the result reports whether the session is still alive and carries the check-in time when there is one. */
+async function fetchComeTime(): Promise<FetchOutcome> {
 	const token = readCookie(TOKEN_COOKIE);
 	const signKey = readCookie(SIGN_KEY_COOKIE);
 	if (token === null || signKey === null) {
-		return null;
+		return { alive: false };
 	}
 
 	const payload = {
@@ -130,7 +141,7 @@ async function fetchComeTime(): Promise<string | null> {
 	try {
 		signature = await signRequest(token, transactionId, timestamp, signKey);
 	} catch {
-		return null;
+		return { alive: true, time: null };
 	}
 
 	let response: Response;
@@ -152,11 +163,16 @@ async function fetchComeTime(): Promise<string | null> {
 			}
 		);
 	} catch {
-		return null;
+		return { alive: true, time: null };
+	}
+
+	// A rejected token comes back as 401 — the one response that means the session itself is gone, so stop probing.
+	if (response.status === 401) {
+		return { alive: false };
 	}
 
 	if (!response.ok) {
-		return null;
+		return { alive: true, time: null };
 	}
 
 	let data: AttendanceResponse;
@@ -164,14 +180,17 @@ async function fetchComeTime(): Promise<string | null> {
 	try {
 		data = await response.json() as AttendanceResponse;
 	} catch {
-		return null;
+		return { alive: true, time: null };
 	}
 
+	// A valid session with no check-in yet returns resultCode 0 and an empty list; that is alive, just nothing to show.
 	if (data.resultCode !== 0 || !Array.isArray(data.resultData) || data.resultData.length === 0) {
-		return null;
+		return { alive: true, time: null };
 	}
 
-	return formatComeTime(data.resultData[0].comeTm ?? '');
+	const time = formatComeTime(data.resultData[0].comeTm ?? '');
+
+	return { alive: true, time };
 }
 
 /** Register the `::after` rule once, so the time renders wherever the attribute lands. */
@@ -203,15 +222,34 @@ function apply(): void {
 	}
 }
 
+/** Tear down the refresh schedule for good, once the session is dead — further probes would only be rejected. A fresh login reloads the page, which re-runs this script and re-arms everything. */
+function stop(): void {
+	if (intervalId !== 0) {
+		window.clearInterval(intervalId);
+		intervalId = 0;
+	}
+
+	if (visibilityHandler !== null) {
+		document.removeEventListener('visibilitychange', visibilityHandler);
+		visibilityHandler = null;
+	}
+}
+
 async function refresh(): Promise<void> {
 	lastFetchAt = Date.now();
 
-	const formatted = await fetchComeTime();
-	if (formatted === null) {
+	const outcome = await fetchComeTime();
+	if (!outcome.alive) {
+		stop();
+
 		return;
 	}
 
-	current = formatted;
+	if (outcome.time === null) {
+		return;
+	}
+
+	current = outcome.time;
 	apply();
 }
 
@@ -241,19 +279,19 @@ export function initAttendance(): void {
 
 	observer.observe(document.body, { childList: true, subtree: true });
 
-	document.addEventListener(
-		'visibilitychange',
-		() => {
-			if (document.visibilityState !== 'visible') {
-				return;
-			}
-
-			if (Date.now() - lastFetchAt >= VISIBILITY_MIN_GAP) {
-				void refresh();
-			}
+	const handler = () => {
+		if (document.visibilityState !== 'visible') {
+			return;
 		}
-	);
 
+		if (Date.now() - lastFetchAt >= VISIBILITY_MIN_GAP) {
+			void refresh();
+		}
+	};
+
+	visibilityHandler = handler;
+	document.addEventListener('visibilitychange', handler);
+
+	intervalId = window.setInterval(refresh, REFRESH_INTERVAL);
 	void refresh();
-	window.setInterval(refresh, REFRESH_INTERVAL);
 }
