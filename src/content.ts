@@ -1,4 +1,5 @@
 import { initAttendance } from './attendance';
+import { initSessionPersistence } from './persist-session';
 
 (() => {
 	'use strict';
@@ -256,3 +257,4 @@ import { initAttendance } from './attendance';
 })();
 
 initAttendance();
+initSessionPersistence();
