@@ -1,6 +1,7 @@
 name: 'Release'
 
-# Cut a release by tagging a commit on main, e.g. `git tag 1.0.0 && git push origin 1.0.0`.
+# Cut a release by tagging a commit on main, e.g. `git tag 1.1.1 && git push origin 1.1.1`.
+# AMO burns any version number that was ever uploaded, so a re-used version will fail the Firefox step — always bump.
 on:
   push:
     tags:
@@ -12,6 +13,14 @@ permissions:
 jobs:
   release:
     runs-on: 'ubuntu-latest'
+    # Store credentials are read as env so each publish step can skip cleanly when its secret is absent.
+    env:
+      EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
+      WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
     steps:
       - name: 'Check out the repository'
         uses: 'actions/checkout@v7'
@@ -36,8 +45,27 @@ jobs:
       - name: 'Build and package both browsers'
         run: 'bun run package'
 
+      # Ordered stablest first: the GitHub release and the Chrome Web Store are reliable, while AMO signing is the flaky one, so it runs last where its bad days block nothing downstream.
       - name: 'Publish the GitHub release'
         uses: 'softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228'
         with:
           files: 'dist/*.zip'
           generate_release_notes: true
+
+      # No subcommand means upload + publish in one go; the CLI reads the OAuth env vars set above.
+      - name: 'Publish to the Chrome Web Store'
+        if: ${{ env.CLIENT_ID != '' }}
+        run: 'bunx chrome-webstore-upload --source "dist/amaranth-tweaks-chromium-${GITHUB_REF_NAME}.zip"'
+
+      # Signs unlisted ("On your own") to match the Invisible AMO listing; switch --channel to listed once it is public.
+      # On success it attaches the signed .xpi to the release published above, keeping the install link automated.
+      - name: 'Sign the Firefox add-on and attach it to the release'
+        if: ${{ env.WEB_EXT_API_KEY != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bunx web-ext sign \
+            --source-dir build/firefox \
+            --artifacts-dir dist \
+            --channel unlisted
+          gh release upload "$GITHUB_REF_NAME" dist/*.xpi --clobber
