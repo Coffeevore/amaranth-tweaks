@@ -83,13 +83,12 @@ import { initUnclipEditor } from './unclip-editor';
 	}
 
 	function applyHeight(box: HTMLElement, dialog: HTMLElement, height: number): void {
-		box.style.setProperty('height', height + 'px', 'important');
-		box.style.setProperty('margin-top', -Math.round(height / 2) + 'px');
+		box.style.setProperty('height', `${height}px`, 'important');
+		box.style.setProperty('margin-top', `${-Math.round(height / 2)}px`);
 
 		const data = dialog.querySelector<HTMLElement>('.dialog_data');
-
 		if (data) {
-			data.style.setProperty('height', height + 'px', 'important');
+			data.style.setProperty('height', `${height}px`, 'important');
 		}
 	}
 
@@ -113,7 +112,7 @@ import { initUnclipEditor } from './unclip-editor';
 
 			const wanted = box.dataset.amaranthHeight;
 
-			if (wanted && box.style.height !== wanted + 'px') {
+			if (wanted && box.style.height !== `${wanted}px`) {
 				applyHeight(box, dialog, Number(wanted));
 			}
 		});
@@ -125,7 +124,6 @@ import { initUnclipEditor } from './unclip-editor';
 	function fitDialog(dialog: HTMLElement): FitResult {
 		const box = findBox(dialog);
 		const scroller = findScroller(dialog);
-
 		if (!box || !scroller) {
 			return 'notready';
 		}
@@ -133,9 +131,7 @@ import { initUnclipEditor } from './unclip-editor';
 		const maxHeight = Math.round(window.innerHeight * MAX_VIEWPORT_RATIO);
 		const currentHeight = box.getBoundingClientRect().height;
 		const overflow = scroller.scrollHeight - scroller.clientHeight;
-
 		let target = currentHeight;
-
 		if (overflow > OVERFLOW_THRESHOLD) {
 			target = currentHeight + overflow;
 		}
@@ -149,7 +145,8 @@ import { initUnclipEditor } from './unclip-editor';
 		box.dataset.amaranthHeight = String(target);
 		applyHeight(box, dialog, target);
 		guardHeight(box, dialog);
-		console.debug('[amaranth-tweaks] resized popup to ' + target + 'px');
+
+		console.debug(`[amaranth-tweaks] resized popup to ${target}px`);
 
 		return 'resized';
 	}
@@ -175,10 +172,9 @@ import { initUnclipEditor } from './unclip-editor';
 		polling.add(dialog);
 
 		let tries = 0;
-
 		const timer = window.setInterval(
 			() => {
-				tries += 1;
+				tries++;
 
 				const grew = fitDialog(dialog) === 'resized';
 				if (grew || tries >= 30 || !dialog.isConnected) {
@@ -194,7 +190,6 @@ import { initUnclipEditor } from './unclip-editor';
 	function scan(root: Document | Element): void {
 		if (isTargetDialog(root)) {
 			processDialog(root);
-
 			return;
 		}
 
@@ -254,7 +249,7 @@ import { initUnclipEditor } from './unclip-editor';
 	// Handle a popup that is already open when the script loads.
 	scan(document);
 
-	console.info('[amaranth-tweaks] active on ' + location.host);
+	console.info(`[amaranth-tweaks] active on ${location.host}`);
 })();
 
 initAttendance();
