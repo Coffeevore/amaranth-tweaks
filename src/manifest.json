@@ -1,7 +1,7 @@
 {
 	"manifest_version": 3,
 	"name": "Amaranth Tweaks",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Grows cramped detail popups on the Okestro groupware (gw.okestro.com) to fit their content, so you don't have to scroll.",
 	"browser_specific_settings": {
 		"gecko": {
