@@ -54,18 +54,17 @@ jobs:
 
       # No subcommand means upload + publish in one go; the CLI reads the OAuth env vars set above.
       - name: 'Publish to the Chrome Web Store'
-        if: ${{ env.CLIENT_ID != '' }}
+        if: ${{ env.EXTENSION_ID != '' && env.CLIENT_ID != '' && env.CLIENT_SECRET != '' && env.REFRESH_TOKEN != '' }}
         run: 'bunx chrome-webstore-upload --source "dist/amaranth-tweaks-chromium-${GITHUB_REF_NAME}.zip"'
 
-      # Signs unlisted ("On your own") to match the Invisible AMO listing; switch --channel to listed once it is public.
-      # On success it attaches the signed .xpi to the release published above, keeping the install link automated.
-      - name: 'Sign the Firefox add-on and attach it to the release'
-        if: ${{ env.WEB_EXT_API_KEY != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # Submits to the public AMO listing, where Mozilla's human review gates publication — hours to days, so there is nothing useful to wait for.
+      # `--approval-timeout 0` returns as soon as the version is accepted; AMO publishes it to the listing on its own once review passes.
+      # No .xpi is attached to the GitHub release any more: listed versions are installed from AMO, and web-ext only downloads a signed file after approval.
+      - name: 'Submit the Firefox add-on to AMO'
+        if: ${{ env.WEB_EXT_API_KEY != '' && env.WEB_EXT_API_SECRET != '' }}
         run: |
           bunx web-ext sign \
             --source-dir build/firefox \
             --artifacts-dir dist \
-            --channel unlisted
-          gh release upload "$GITHUB_REF_NAME" dist/*.xpi --clobber
+            --channel listed \
+            --approval-timeout 0
