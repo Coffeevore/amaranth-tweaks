@@ -16,6 +16,7 @@ jobs:
     # Store credentials are read as env so each publish step can skip cleanly when its secret is absent.
     env:
       EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
       CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
       CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
       REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
@@ -53,8 +54,9 @@ jobs:
           generate_release_notes: true
 
       # No subcommand means upload + publish in one go; the CLI reads the OAuth env vars set above.
+      # PUBLISHER_ID is the developer account, not the extension: the Web Store API v2 addresses items as `publishers/{id}/items/{id}`, so both are required.
       - name: 'Publish to the Chrome Web Store'
-        if: ${{ env.EXTENSION_ID != '' && env.CLIENT_ID != '' && env.CLIENT_SECRET != '' && env.REFRESH_TOKEN != '' }}
+        if: ${{ env.EXTENSION_ID != '' && env.PUBLISHER_ID != '' && env.CLIENT_ID != '' && env.CLIENT_SECRET != '' && env.REFRESH_TOKEN != '' }}
         run: 'bunx chrome-webstore-upload --source "dist/amaranth-tweaks-chromium-${GITHUB_REF_NAME}.zip"'
 
       # Submits to the public AMO listing, where Mozilla's human review gates publication — hours to days, so there is nothing useful to wait for.
