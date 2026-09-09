@@ -25,6 +25,12 @@ const STYLE_ID = 'amaranth-come-time-style';
 /** Re-fetch cadence while the tab stays open. Check-in time changes at most once a day, so hourly is plenty. */
 const REFRESH_INTERVAL = 60 * 60 * 1000;
 
+/**
+ * Cadence while there is no usable session.
+ * A probe with nothing to send costs one cookie read, and the login it waits for settles within seconds.
+ */
+const UNAUTHENTICATED_RETRY_INTERVAL = 3 * 1000;
+
 /** Ignore a visibility-triggered re-fetch if we already fetched this recently (background tabs throttle the interval). */
 const VISIBILITY_MIN_GAP = 30 * 60 * 1000;
 
@@ -37,21 +43,29 @@ type AttendanceResponse = {
 	resultData?: AttendanceRecord[];
 };
 
-/** The outcome of one attendance fetch: a dead session (stop probing) or a live one that may or may not carry a check-in time. */
+/**
+ * The outcome of one attendance probe.
+ * Neither failure is terminal.
+ * This script runs from `document_idle` onwards, which on a first visit is the login screen, so a usable session routinely arrives in the same document long after the first probe.
+ */
 type FetchOutcome =
-	| { alive: true; time: string | null }
-	| { alive: false };
+	| { status: 'alive'; time: string | null }
+	| { status: 'unauthenticated' }
+	| { status: 'rejected'; token: string };
 
 /** The formatted time we want on screen, cached so we can re-assert it when the header re-renders. */
 let current = '';
 
 let lastFetchAt = 0;
 
-/** Handle for the refresh interval, so a dead session can cancel it; 0 when nothing is scheduled. */
-let intervalId = 0;
+/** Handle for the queued probe, so it can be replaced or brought forward; 0 when nothing is scheduled. */
+let timerId = 0;
 
-/** The visibility listener, kept so `stop()` can detach it; null before init and after teardown. */
-let visibilityHandler: (() => void) | null = null;
+/**
+ * The `oAuthToken` the server answered 401 for.
+ * Re-sending it would only earn another 401, so probes skip the network while the page still carries it; a fresh login swaps the token and the badge recovers on its own.
+ */
+let rejectedToken: string | null = null;
 
 /** Today as `yyyyMMdd`, matching the API's `atDt`. */
 function today(): string {
@@ -115,12 +129,17 @@ async function signRequest(token: string, transactionId: string, timestamp: numb
 	return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
-/** POST for today's own attendance (admin: false scopes it to the current user); the result reports whether the session is still alive and carries the check-in time when there is one. */
+/** POST for today's own attendance (admin: false scopes it to the current user); the result reports whether we have a usable session and carries the check-in time when there is one. */
 async function fetchComeTime(): Promise<FetchOutcome> {
 	const token = readCookie(TOKEN_COOKIE);
 	const signKey = readCookie(SIGN_KEY_COOKIE);
 	if (token === null || signKey === null) {
-		return { alive: false };
+		return { status: 'unauthenticated' };
+	}
+
+	// This exact token has already been refused, so spare the server (and the console) another doomed signed request.
+	if (token === rejectedToken) {
+		return { status: 'rejected', token };
 	}
 
 	const payload = {
@@ -143,7 +162,7 @@ async function fetchComeTime(): Promise<FetchOutcome> {
 	try {
 		signature = await signRequest(token, transactionId, timestamp, signKey);
 	} catch {
-		return { alive: true, time: null };
+		return { status: 'alive', time: null };
 	}
 
 	let response: Response;
@@ -165,16 +184,16 @@ async function fetchComeTime(): Promise<FetchOutcome> {
 			}
 		);
 	} catch {
-		return { alive: true, time: null };
+		return { status: 'alive', time: null };
 	}
 
-	// A rejected token comes back as 401 — the one response that means the session itself is gone, so stop probing.
+	// A rejected token comes back as 401: these credentials are spent, though a later login can still hand us live ones.
 	if (response.status === 401) {
-		return { alive: false };
+		return { status: 'rejected', token };
 	}
 
 	if (!response.ok) {
-		return { alive: true, time: null };
+		return { status: 'alive', time: null };
 	}
 
 	let data: AttendanceResponse;
@@ -182,17 +201,17 @@ async function fetchComeTime(): Promise<FetchOutcome> {
 	try {
 		data = await response.json() as AttendanceResponse;
 	} catch {
-		return { alive: true, time: null };
+		return { status: 'alive', time: null };
 	}
 
 	// A valid session with no check-in yet returns resultCode 0 and an empty list; that is alive, just nothing to show.
 	if (data.resultCode !== 0 || !Array.isArray(data.resultData) || data.resultData.length === 0) {
-		return { alive: true, time: null };
+		return { status: 'alive', time: null };
 	}
 
 	const time = formatComeTime(data.resultData[0].comeTm ?? '');
 
-	return { alive: true, time };
+	return { status: 'alive', time };
 }
 
 /** Register the `::after` rule once, so the time renders wherever the attribute lands. */
@@ -225,37 +244,51 @@ function apply(): void {
 }
 
 /**
- * Tear down the refresh schedule for good, once the session is dead — further probes would only be rejected.
- * A fresh login reloads the page, which re-runs this script and re-arms everything.
+ * Queue the next probe, replacing whatever was already pending.
+ * Every scheduling path goes through here, so exactly one probe is ever outstanding.
  */
-function stop(): void {
-	if (intervalId !== 0) {
-		window.clearInterval(intervalId);
-		intervalId = 0;
+function schedule(delay: number): void {
+	if (timerId !== 0) {
+		window.clearTimeout(timerId);
 	}
 
-	if (visibilityHandler !== null) {
-		document.removeEventListener('visibilitychange', visibilityHandler);
-		visibilityHandler = null;
-	}
+	timerId = window.setTimeout(
+		() => {
+			timerId = 0;
+			void refresh();
+		},
+		delay
+	);
 }
 
 async function refresh(): Promise<void> {
 	lastFetchAt = Date.now();
 
 	const outcome = await fetchComeTime();
-	if (!outcome.alive) {
-		stop();
+
+	// Nobody is logged in yet, so there is no token to hold against a later one.
+	if (outcome.status === 'unauthenticated') {
+		rejectedToken = null;
+		schedule(UNAUTHENTICATED_RETRY_INTERVAL);
 
 		return;
 	}
 
-	if (outcome.time === null) {
+	if (outcome.status === 'rejected') {
+		rejectedToken = outcome.token;
+		schedule(UNAUTHENTICATED_RETRY_INTERVAL);
+
 		return;
 	}
 
-	current = outcome.time;
-	apply();
+	rejectedToken = null;
+
+	if (outcome.time !== null) {
+		current = outcome.time;
+		apply();
+	}
+
+	schedule(REFRESH_INTERVAL);
 }
 
 /** Wire up the badge: style, a self-healing observer for header re-renders, and the refresh schedule. */
@@ -284,19 +317,19 @@ export function initAttendance(): void {
 
 	observer.observe(document.body, { childList: true, subtree: true });
 
-	const handler = () => {
-		if (document.visibilityState !== 'visible') {
-			return;
+	// Hidden tabs throttle timers hard, so a long-backgrounded tab returns with a stale badge; bring the next probe forward rather than waiting out the throttled delay.
+	document.addEventListener(
+		'visibilitychange',
+		() => {
+			if (document.visibilityState !== 'visible') {
+				return;
+			}
+
+			if (Date.now() - lastFetchAt >= VISIBILITY_MIN_GAP) {
+				schedule(0);
+			}
 		}
+	);
 
-		if (Date.now() - lastFetchAt >= VISIBILITY_MIN_GAP) {
-			void refresh();
-		}
-	};
-
-	visibilityHandler = handler;
-	document.addEventListener('visibilitychange', handler);
-
-	intervalId = window.setInterval(refresh, REFRESH_INTERVAL);
 	void refresh();
 }
