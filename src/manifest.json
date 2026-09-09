@@ -1,8 +1,8 @@
 {
 	"manifest_version": 3,
 	"name": "Amaranth Tweaks",
-	"version": "1.1.1",
-	"description": "Usability tweaks for the Okestro groupware: bigger detail popups, a check-in time badge, and a login that survives restarts.",
+	"version": "1.2.0",
+	"description": "Usability tweaks for the Okestro groupware: bigger popups, un-clipped approval forms, a check-in badge, and a persistent login.",
 	"browser_specific_settings": {
 		"gecko": {
 			"id": "amaranth-tweaks@coffeevore",
