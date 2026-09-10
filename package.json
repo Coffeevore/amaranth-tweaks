@@ -11,8 +11,7 @@
 		"lint": "bun run build && web-ext lint --source-dir build/firefox",
 		"dev:firefox": "bun run build && web-ext run --source-dir build/firefox",
 		"dev:chromium": "bun run build && web-ext run --target chromium --source-dir build/chromium",
-		"package": "bun run build && web-ext build --source-dir build/firefox --artifacts-dir dist --filename amaranth-tweaks-firefox-{version}.zip --overwrite-dest && web-ext build --source-dir build/chromium --artifacts-dir dist --filename amaranth-tweaks-chromium-{version}.zip --overwrite-dest",
-		"sign": "bun run build && web-ext sign --source-dir build/firefox --artifacts-dir dist --channel unlisted"
+		"package": "bun run build && web-ext build --source-dir build/firefox --artifacts-dir dist --filename amaranth-tweaks-firefox-{version}.zip --overwrite-dest && web-ext build --source-dir build/chromium --artifacts-dir dist --filename amaranth-tweaks-chromium-{version}.zip --overwrite-dest"
 	},
 	"devDependencies": {
 		"bun-types": "^1.4.2",
