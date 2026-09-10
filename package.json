@@ -1,7 +1,7 @@
 {
 	"name": "amaranth-tweaks",
 	"version": "1.2.0",
-	"description": "Cross-browser extension that enlarges cramped detail popups on the Okestro groupware.",
+	"description": "Usability tweaks for the Okestro groupware: bigger popups, un-clipped approval forms, a check-in badge, and a persistent login.",
 	"license": "MIT",
 	"private": true,
 	"type": "module",

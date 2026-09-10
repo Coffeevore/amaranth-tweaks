@@ -17,7 +17,7 @@ Four independent tweaks, all scoped to `gw.okestro.com` and doing nothing anywhe
 
 ## Project layout
 
-- `src/content.ts` — the entry point: the popup resizer, plus the wiring that starts the other two features.
+- `src/content.ts` — the entry point: the popup resizer, plus the wiring that starts the other three features.
 - `src/attendance.ts` — the check-in badge; reads the time from the HR API using your active session and renders it via a CSS `::after` rule so the site's React tree never sees a foreign node.
 - `src/persist-session.ts` — the session-cookie persistence.
 - `src/unclip-editor.ts` — the approval-form editor fix; a single injected CSS rule.

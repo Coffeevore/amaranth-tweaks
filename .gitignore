@@ -3,4 +3,5 @@ build/
 dist/
 web-ext-artifacts/
 .idea/
+.playwright-mcp/
 *.log
