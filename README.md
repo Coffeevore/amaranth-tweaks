@@ -13,7 +13,7 @@ Four independent tweaks, all scoped to `gw.okestro.com` and doing nothing anywhe
 
 ## Requirements
 
-[Bun](https://bun.sh), which also runs the TypeScript build. Firefox's `web-ext` tooling comes in as a dev dependency, used by `bun run sign` and `bun run lint`.
+[Bun](https://bun.sh), which also runs the TypeScript build. Firefox's `web-ext` tooling comes in as a dev dependency, used by `bun run lint`, `bun run package`, and the `dev:*` runners.
 
 ## Project layout
 
@@ -42,17 +42,11 @@ This produces two ready-to-load extensions: `build/firefox` and `build/chromium`
 
 Loading into your normal profile reuses your existing logged-in session; `bun run dev:*` launches a fresh throwaway profile instead. The check-in badge and persistent login only do anything while you are logged into `gw.okestro.com`.
 
-## Install manually
+## Install
 
-**Firefox** — sign a build yourself. Get API credentials at <https://addons.mozilla.org/developers/addon/api/key/>, then:
+**Firefox** — from the [add-ons listing](https://addons.mozilla.org/firefox/addon/amaranth-tweaks/). Mozilla signs and hosts every tagged release, so updates arrive on their own.
 
-```sh
-WEB_EXT_API_KEY=your-issuer WEB_EXT_API_SECRET=your-secret bun run sign
-```
-
-The signed `.xpi` lands in `dist/`; install it via `about:addons` → gear → *Install Add-on From File…*.
-
-**Chromium browsers** — a *Load unpacked* extension already persists across restarts, so pointing at `build/chromium` is enough for personal use.
+**Chromium browsers** — from the Chrome Web Store listing. Failing that, a *Load unpacked* extension pointed at `build/chromium` persists across restarts and needs no store at all.
 
 ## Adding more popups
 
@@ -69,7 +63,8 @@ const TARGET_TITLES = ['카드사용내역상세', '현금영수증상세'];
 - `bun run lint` — build, then validate with `web-ext lint`.
 - `bun run dev:firefox` / `bun run dev:chromium` — build and launch the browser with the extension loaded.
 - `bun run package` — build unsigned zips for both targets into `dist/`.
-- `bun run sign` — build and sign the Firefox `.xpi` into `dist/`.
+
+Releases are cut by tagging a commit on `main` (`git tag 1.2.0 && git push origin 1.2.0`). The workflow in `.github/workflows/release.yaml` builds, publishes the GitHub release, and submits to both stores, so there is nothing to sign by hand.
 
 ## How it works
 
