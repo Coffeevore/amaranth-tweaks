@@ -14,7 +14,7 @@
 		"package": "bun run build && web-ext build --source-dir build/firefox --artifacts-dir dist --filename amaranth-tweaks-firefox-{version}.zip --overwrite-dest && web-ext build --source-dir build/chromium --artifacts-dir dist --filename amaranth-tweaks-chromium-{version}.zip --overwrite-dest"
 	},
 	"devDependencies": {
-		"bun-types": "^1.4.2",
+		"bun-types": "^1.4.3",
 		"chrome-webstore-upload-cli": "^4.0.2",
 		"typescript": "^7.0.2",
 		"web-ext": "^10.7.0"
